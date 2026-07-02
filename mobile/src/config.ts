@@ -6,11 +6,5 @@ export const API_BASE_URL = "http://localhost:3000";
 // The phrase that triggers automatic recording.
 export const WAKE_WORD = "appunta";
 
-// Locale used for both the always-on wake-word recognizer and transcription hints.
+// Locale used for both the always-on wake-word recognizer and transcription.
 export const SPEECH_RECOGNITION_LOCALE = "it-IT";
-
-// Stop recording automatically after this much silence follows speech.
-export const SILENCE_TIMEOUT_MS = 1800;
-
-// Hard cap so a stuck recording can't run forever.
-export const MAX_RECORDING_MS = 30000;

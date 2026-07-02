@@ -8,16 +8,26 @@ export async function fetchNotes(search?: string): Promise<Note[]> {
   return data;
 }
 
+const MIME_BY_EXTENSION: Record<string, string> = {
+  wav: "audio/wav",
+  caf: "audio/x-caf",
+  m4a: "audio/m4a",
+};
+
 export async function uploadNote(params: {
   audioUri: string;
+  transcript: string;
   source: "manual" | "wake_word";
 }): Promise<Note> {
+  const extension = params.audioUri.match(/\.([a-zA-Z0-9]+)$/)?.[1]?.toLowerCase() ?? "caf";
+
   const form = new FormData();
   form.append("audio", {
     uri: params.audioUri,
-    name: "note.m4a",
-    type: "audio/m4a",
+    name: `note.${extension}`,
+    type: MIME_BY_EXTENSION[extension] ?? "audio/octet-stream",
   } as unknown as Blob);
+  form.append("transcript", params.transcript);
   form.append("source", params.source);
 
   const { data } = await api.post<Note>("/notes", form, {

@@ -5,7 +5,6 @@ import multer from "multer";
 import { z } from "zod";
 import { prisma } from "../db";
 import { AuthedRequest, requireAuth } from "../middleware/auth";
-import { transcribeAudio } from "../services/transcription";
 
 export const notesRouter = Router();
 notesRouter.use(requireAuth);
@@ -30,40 +29,33 @@ function deriveTitle(transcript: string): string {
   return title.length > 0 ? title : "Appunto vocale";
 }
 
-// Strip a leading wake word (e.g. "appunta") that may have leaked into the transcript.
-function stripWakeWord(transcript: string): string {
-  return transcript.replace(/^\s*appunta[,:]?\s*/i, "").trim();
-}
-
 notesRouter.post("/", upload.single("audio"), async (req: AuthedRequest, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Missing audio file" });
   }
 
-  try {
-    const rawTranscript = await transcribeAudio(req.file.path);
-    const transcript = stripWakeWord(rawTranscript);
-    const title = typeof req.body.title === "string" && req.body.title.trim().length > 0
-      ? req.body.title.trim()
-      : deriveTitle(transcript);
-    const source = req.body.source === "wake_word" ? "wake_word" : "manual";
-
-    const note = await prisma.note.create({
-      data: {
-        userId: req.userId!,
-        title,
-        transcript,
-        audioPath: req.file.filename,
-        source,
-      },
-    });
-
-    res.status(201).json(note);
-  } catch (err) {
+  const transcript = typeof req.body.transcript === "string" ? req.body.transcript.trim() : "";
+  if (!transcript) {
     fs.unlink(req.file.path, () => {});
-    console.error("Transcription failed", err);
-    res.status(502).json({ error: "Transcription failed" });
+    return res.status(400).json({ error: "Missing transcript" });
   }
+
+  const title = typeof req.body.title === "string" && req.body.title.trim().length > 0
+    ? req.body.title.trim()
+    : deriveTitle(transcript);
+  const source = req.body.source === "wake_word" ? "wake_word" : "manual";
+
+  const note = await prisma.note.create({
+    data: {
+      userId: req.userId!,
+      title,
+      transcript,
+      audioPath: req.file.filename,
+      source,
+    },
+  });
+
+  res.status(201).json(note);
 });
 
 notesRouter.get("/", async (req: AuthedRequest, res) => {

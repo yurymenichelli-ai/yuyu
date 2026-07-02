@@ -9,13 +9,15 @@ Apple e non possono essere automatizzati da qui.
 ```bash
 cd backend
 cp .env.example .env
-# apri .env e imposta:
-#   JWT_SECRET       una stringa lunga e casuale
-#   OPENAI_API_KEY   la tua chiave da https://platform.openai.com/api-keys
+# apri .env e imposta JWT_SECRET con una stringa lunga e casuale
 npm install
 npx prisma migrate dev --name init
 npm run dev
 ```
+
+Il backend si limita a salvare audio e testo: la trascrizione avviene
+interamente sul telefono (riconoscimento vocale nativo, gratuito), quindi
+non serve nessuna chiave API a pagamento.
 
 Il backend parte su `http://localhost:3000`. Per usarlo dal telefono, questo
 indirizzo deve essere raggiungibile dall'iPhone:
@@ -92,6 +94,6 @@ telefono.
 - Il riconoscimento vocale continuo di iOS può fermarsi da solo dopo un po'
   (interruzioni, timeout di sistema): l'app lo riavvia automaticamente, ma
   potresti notare un brevissimo "buco" in cui non sta ascoltando.
-- Se non dici nulla per troppo tempo dopo "appunta", o parli per più di 30
-  secondi, la registrazione si interrompe automaticamente (soglie
-  configurabili in `mobile/src/config.ts`).
+- La registrazione dell'appunto si ferma da sola quando il sistema rileva
+  una pausa nel parlato (gestito dal riconoscimento vocale di iOS, non
+  configurabile).

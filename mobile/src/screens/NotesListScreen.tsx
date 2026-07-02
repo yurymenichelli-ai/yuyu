@@ -13,7 +13,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { fetchNotes, uploadNote } from "../api/notes";
-import { useVoiceRecorder } from "../services/useVoiceRecorder";
+import { startManualCapture, stopManualCapture } from "../services/speechCapture";
 import { useAuth } from "../auth/AuthContext";
 import { Note } from "../types";
 import { RootStackParamList } from "../navigation/RootNavigator";
@@ -26,7 +26,7 @@ export default function NotesListScreen({ navigation }: Props) {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
-  const recorder = useVoiceRecorder();
+  const [isRecording, setIsRecording] = useState(false);
 
   const load = useCallback(async (query?: string) => {
     setIsLoading(true);
@@ -47,23 +47,28 @@ export default function NotesListScreen({ navigation }: Props) {
   );
 
   const onToggleRecord = async () => {
-    if (recorder.isRecording) {
-      const uri = await recorder.stop();
-      if (!uri) return;
+    if (isRecording) {
+      setIsRecording(false);
       setIsUploading(true);
       try {
-        await uploadNote({ audioUri: uri, source: "manual" });
+        const { transcript, audioUri } = await stopManualCapture();
+        if (!transcript || !audioUri) {
+          Alert.alert("Nessun testo rilevato", "Non ho capito nulla, riprova parlando più chiaramente.");
+          return;
+        }
+        await uploadNote({ audioUri, transcript, source: "manual" });
         await load(search);
       } catch {
-        Alert.alert("Errore", "Trascrizione non riuscita. Riprova.");
+        Alert.alert("Errore", "Salvataggio non riuscito.");
       } finally {
         setIsUploading(false);
       }
     } else {
       try {
-        await recorder.start();
+        await startManualCapture();
+        setIsRecording(true);
       } catch {
-        Alert.alert("Permesso negato", "Serve l'accesso al microfono per registrare.");
+        Alert.alert("Permesso negato", "Serve il permesso di riconoscimento vocale per registrare.");
       }
     }
   };
@@ -106,14 +111,14 @@ export default function NotesListScreen({ navigation }: Props) {
       )}
 
       <TouchableOpacity
-        style={[styles.recordButton, recorder.isRecording && styles.recordButtonActive]}
+        style={[styles.recordButton, isRecording && styles.recordButtonActive]}
         onPress={onToggleRecord}
         disabled={isUploading}
       >
         {isUploading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.recordButtonText}>{recorder.isRecording ? "Stop" : "Registra"}</Text>
+          <Text style={styles.recordButtonText}>{isRecording ? "Stop" : "Registra"}</Text>
         )}
       </TouchableOpacity>
     </View>

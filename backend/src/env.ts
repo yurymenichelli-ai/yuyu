@@ -16,5 +16,4 @@ function required(name: string): string {
 export const env = {
   port: Number(process.env.PORT ?? 3000),
   jwtSecret: required("JWT_SECRET"),
-  openaiApiKey: required("OPENAI_API_KEY"),
 };
