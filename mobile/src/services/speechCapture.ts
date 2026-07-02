@@ -1,3 +1,4 @@
+import { setAudioModeAsync } from "expo-audio";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import { SPEECH_RECOGNITION_LOCALE, WAKE_WORD } from "../config";
 import { setWakeWordDebug } from "./wakeWordDebug";
@@ -130,6 +131,11 @@ export async function enableWakeWordListening(onNoteCaptured: (result: CaptureRe
     setWakeWordDebug({ status: "permesso negato" });
     return false;
   }
+
+  // Without this, iOS suspends the microphone (and the app) as soon as the
+  // screen locks or another app comes to the foreground.
+  await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: true });
+
   onWakeNoteCaptured = onNoteCaptured;
   wakeWordEnabled = true;
   if (mode === "idle") startWakeListening();
