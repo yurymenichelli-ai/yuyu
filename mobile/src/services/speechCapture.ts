@@ -20,8 +20,8 @@ type Mode =
 // the wake-triggered capture is cut off manually: it stops once no new
 // transcript arrives for SILENCE_TIMEOUT_MS, with MAX_CAPTURE_MS as a hard
 // backstop in case no "silence" is ever detected at all.
-const SILENCE_TIMEOUT_MS = 2000;
-const MAX_CAPTURE_MS = 20000;
+const SILENCE_TIMEOUT_MS = 1500;
+const MAX_CAPTURE_MS = 10000;
 
 let mode: Mode = "idle";
 let wakeWordEnabled = false;
