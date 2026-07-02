@@ -1,34 +1,43 @@
 import React, { useEffect, useRef } from "react";
 import { Alert } from "react-native";
-import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
-  useAudioRecorderState,
-} from "expo-audio";
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
 import { uploadNote } from "../api/notes";
-import { SILENCE_TIMEOUT_MS, MAX_RECORDING_MS } from "../config";
-import { getPicovoiceAccessKey, isWakeWordEnabled } from "./wakeWordSettings";
-import { pauseWakeWordListener, resumeWakeWordListener, startWakeWordListener, stopWakeWordListener } from "./wakeWordService";
+import { SILENCE_TIMEOUT_MS, MAX_RECORDING_MS, SPEECH_RECOGNITION_LOCALE, WAKE_WORD } from "../config";
+import { isWakeWordEnabled } from "./wakeWordSettings";
 
 const SILENCE_THRESHOLD_DB = -40;
 const POLL_INTERVAL_MS = 250;
 
 /**
- * Mounted once while the user is logged in. Renders nothing — it just keeps
- * Porcupine listening for "appunta" and, on detection, records the note that
- * follows until a pause in speech (or a hard time cap), uploads it, then goes
- * back to listening.
+ * Mounted once while the user is logged in. Renders nothing — it keeps the
+ * device's on-device speech recognizer listening continuously and, as soon
+ * as a transcript contains "appunta", records the note that follows until a
+ * pause in speech (or a hard time cap), uploads it, then resumes listening.
+ *
+ * This uses the phone's built-in speech recognition (no external account
+ * needed) rather than a dedicated wake-word engine, so it's a bit less
+ * battery-efficient and reacts slightly slower than a purpose-built one.
  */
 export default function WakeWordListener() {
   const isRecordingNoteRef = useRef(false);
   const isFinishingRef = useRef(false);
+  const hasTriggeredRef = useRef(false);
   const lastLoudAtRef = useRef(0);
   const recordingStartedAtRef = useRef(0);
+  const isEnabledRef = useRef(false);
 
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const recorderState = useAudioRecorderState(recorder, POLL_INTERVAL_MS);
+
+  const startListening = () => {
+    ExpoSpeechRecognitionModule.start({
+      lang: SPEECH_RECOGNITION_LOCALE,
+      continuous: true,
+      interimResults: true,
+      requiresOnDeviceRecognition: true,
+    });
+  };
 
   const finishRecording = async () => {
     if (isFinishingRef.current) return;
@@ -44,7 +53,8 @@ export default function WakeWordListener() {
       // A missed note is better than crashing the always-on listener.
     } finally {
       isFinishingRef.current = false;
-      await resumeWakeWordListener();
+      hasTriggeredRef.current = false;
+      if (isEnabledRef.current) startListening();
     }
   };
 
@@ -63,53 +73,68 @@ export default function WakeWordListener() {
     }
   }, [recorderState.metering, recorderState.durationMillis]);
 
-  const onWakeWord = async () => {
-    if (isRecordingNoteRef.current) return;
+  const onWakeWordDetected = async () => {
+    if (hasTriggeredRef.current || isRecordingNoteRef.current) return;
+    hasTriggeredRef.current = true;
+
     try {
-      await pauseWakeWordListener();
+      ExpoSpeechRecognitionModule.stop();
       await recorder.prepareToRecordAsync();
       recorder.record();
       isRecordingNoteRef.current = true;
       recordingStartedAtRef.current = Date.now();
       lastLoudAtRef.current = Date.now();
     } catch {
-      await resumeWakeWordListener();
+      hasTriggeredRef.current = false;
+      startListening();
     }
   };
+
+  useSpeechRecognitionEvent("result", (event) => {
+    if (isRecordingNoteRef.current || hasTriggeredRef.current) return;
+    const transcript = event.results[0]?.transcript?.toLowerCase() ?? "";
+    if (transcript.includes(WAKE_WORD)) {
+      onWakeWordDetected();
+    }
+  });
+
+  useSpeechRecognitionEvent("end", () => {
+    // The OS can stop the recognizer on its own (timeouts, interruptions).
+    // Restart it unless we're the ones who stopped it to record a note.
+    if (isEnabledRef.current && !isRecordingNoteRef.current && !hasTriggeredRef.current) {
+      startListening();
+    }
+  });
+
+  useSpeechRecognitionEvent("error", (event) => {
+    if (event.error === "no-speech") return;
+    Alert.alert("Errore ascolto vocale", event.message || event.error);
+  });
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       const enabled = await isWakeWordEnabled();
-      if (!enabled) return;
+      if (!enabled || cancelled) return;
 
-      const accessKey = await getPicovoiceAccessKey();
-      if (!accessKey) return;
+      const recognitionPermission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!recognitionPermission.granted) return;
 
-      const permission = await requestRecordingPermissionsAsync();
-      if (!permission.granted) return;
+      const recordingPermission = await requestRecordingPermissionsAsync();
+      if (!recordingPermission.granted) return;
       if (cancelled) return;
 
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: true });
 
-      try {
-        await startWakeWordListener({
-          accessKey,
-          onWakeWord,
-          onError: (message) => Alert.alert("Errore ascolto vocale", message),
-        });
-      } catch {
-        Alert.alert(
-          "Ascolto vocale non attivo",
-          "Controlla la chiave Picovoice e i file del modello 'appunta' nelle Impostazioni."
-        );
-      }
+      isEnabledRef.current = true;
+      startListening();
     })();
 
     return () => {
       cancelled = true;
-      stopWakeWordListener();
+      isEnabledRef.current = false;
+      ExpoSpeechRecognitionModule.stop();
     };
   }, []);
 

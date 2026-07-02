@@ -3,9 +3,11 @@
 // (e.g. "http://192.168.1.10:3000").
 export const API_BASE_URL = "http://localhost:3000";
 
-// Must match the wake word phrase configured in the Picovoice Console
-// ("appunta") and used to name the downloaded .ppn model file.
+// The phrase that triggers automatic recording.
 export const WAKE_WORD = "appunta";
+
+// Locale used for both the always-on wake-word recognizer and transcription hints.
+export const SPEECH_RECOGNITION_LOCALE = "it-IT";
 
 // Stop recording automatically after this much silence follows speech.
 export const SILENCE_TIMEOUT_MS = 1800;

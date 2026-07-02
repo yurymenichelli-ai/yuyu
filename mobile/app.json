@@ -33,6 +33,13 @@
         {
           "microphonePermission": "L'app ascolta la parola \"appunta\" per registrare i tuoi appunti vocali."
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "L'app ascolta la parola \"appunta\" per registrare i tuoi appunti vocali.",
+          "speechRecognitionPermission": "L'app usa il riconoscimento vocale del telefono per capire quando dici \"appunta\"."
+        }
       ]
     ]
   }

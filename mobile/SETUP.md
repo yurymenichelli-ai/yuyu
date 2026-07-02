@@ -1,8 +1,8 @@
 # Setup — Appunti Vocali
 
 Guida per portare l'app da questo codice a qualcosa che funziona davvero sul
-tuo iPhone. Vanno fatti alcuni passaggi manuali che richiedono i tuoi account
-personali (Picovoice, Apple) e non possono essere automatizzati da qui.
+tuo iPhone. Vanno fatti alcuni passaggi manuali che richiedono il tuo account
+Apple e non possono essere automatizzati da qui.
 
 ## 1. Backend
 
@@ -29,31 +29,17 @@ indirizzo deve essere raggiungibile dall'iPhone:
   codice non cambia, cambia solo dove giri `npm run start` e l'URL in
   `config.ts`.
 
-## 2. Parola chiave "appunta" (Picovoice)
+## 2. Parola chiave "appunta"
 
-1. Crea un account gratuito su https://console.picovoice.ai/
-2. Nella sezione **Porcupine**, crea una nuova parola chiave personalizzata:
-   - Testo: `appunta`
-   - Lingua: Italiano
-   - Piattaforma: iOS
-3. Scarica il file generato (`.ppn`) e rinominalo `appunta_ios.ppn`
-4. Scarica anche il modello linguistico italiano `porcupine_params_it.pv`
-   (disponibile nella stessa pagina della Console, o nel repo
-   [Porcupine su GitHub](https://github.com/Picovoice/porcupine) sotto
-   `lib/common/`)
-5. Copia entrambi i file in `mobile/assets/porcupine/`, sovrascrivendo i
-   placeholder vuoti. Cancella `PLACEHOLDER_REPLACE_ME.txt`.
-6. Dalla Console, copia la tua **AccessKey** (in alto a destra).
-
-Senza questi file reali l'ascolto vocale non si attiva: l'app mostrerà un
-avviso ma continuerà a funzionare normalmente per tutto il resto (login,
-registrazione manuale degli appunti, ecc).
+Non serve nessun account esterno: l'ascolto usa il riconoscimento vocale
+nativo del telefono (lo stesso motore usato dalla tastiera per la dettatura).
+Basta attivarlo dalle Impostazioni dell'app una volta installata (vedi punto 4).
 
 ## 3. Build per iPhone (serve il tuo Mac)
 
-Il modulo Porcupine contiene codice nativo, quindi non funziona dentro
-l'app "Expo Go" scaricata dall'App Store: serve generare una build di
-sviluppo con Xcode.
+Il riconoscimento vocale in ascolto continuo richiede codice nativo, quindi
+non funziona dentro l'app "Expo Go" scaricata dall'App Store: serve generare
+una build di sviluppo con Xcode.
 
 Dal tuo Mac, con Xcode installato e il telefono collegato via cavo (o sulla
 stessa rete per wireless debugging):
@@ -89,9 +75,9 @@ telefono.
 ## 4. Nell'app
 
 1. Registrati/accedi con la tua email.
-2. Vai in **Impostazioni** (icona ⚙️ in alto), incolla la tua AccessKey
-   Picovoice, attiva "Ascolto attivo" e riavvia l'app.
-3. Concedi il permesso del microfono quando richiesto.
+2. Vai in **Impostazioni** (icona ⚙️ in alto), attiva "Ascolto attivo" e
+   riavvia l'app.
+3. Concedi i permessi di microfono e riconoscimento vocale quando richiesti.
 4. Prova dicendo ad alta voce: *"appunta, comprare il latte"* — dopo una
    breve pausa l'appunto trascritto comparirà nella lista.
 
@@ -100,7 +86,12 @@ telefono.
 - iOS interrompe l'ascolto in background se **forzi la chiusura dell'app**
   dallo switcher (swipe verso l'alto). L'app deve restare in background,
   non chiusa del tutto.
-- L'ascolto continuo consuma batteria più di un uso normale del telefono.
+- L'ascolto continuo consuma batteria più di un uso normale del telefono,
+  più che con un motore di wake-word dedicato (compromesso accettato per
+  evitare la registrazione con email aziendale richiesta da Picovoice).
+- Il riconoscimento vocale continuo di iOS può fermarsi da solo dopo un po'
+  (interruzioni, timeout di sistema): l'app lo riavvia automaticamente, ma
+  potresti notare un brevissimo "buco" in cui non sta ascoltando.
 - Se non dici nulla per troppo tempo dopo "appunta", o parli per più di 30
   secondi, la registrazione si interrompe automaticamente (soglie
   configurabili in `mobile/src/config.ts`).
