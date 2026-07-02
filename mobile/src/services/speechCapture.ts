@@ -77,14 +77,19 @@ function beginWakeCaptureSession(): void {
   setWakeWordDebug({ status: "registro l'appunto..." });
   ExpoSpeechRecognitionModule.start({
     lang: SPEECH_RECOGNITION_LOCALE,
-    continuous: true,
+    // false lets iOS's own native end-of-speech detection stop the session
+    // once it hears a pause. Unlike our own JS timers, this keeps working
+    // when the screen is locked and the app's JS thread gets throttled.
+    continuous: false,
     interimResults: true,
     requiresOnDeviceRecognition: true,
     recordingOptions: { persist: true },
   });
 
+  // Backstop for the (rare) case iOS never reports an end on its own. This
+  // JS timer is best-effort: it reliably fires in the foreground but may be
+  // delayed while the screen is locked, same as any other JS timer.
   clearCaptureTimers();
-  resetSilenceTimer();
   maxDurationTimer = setTimeout(() => {
     if (mode === "capturing-wake") ExpoSpeechRecognitionModule.stop();
   }, MAX_CAPTURE_MS);
