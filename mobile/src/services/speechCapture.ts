@@ -16,12 +16,39 @@ type Mode =
   | "transitioning-to-manual-capture"
   | "capturing-manual";
 
+// iOS's own end-of-speech detection isn't reliable enough in background, so
+// the wake-triggered capture is cut off manually: it stops once no new
+// transcript arrives for SILENCE_TIMEOUT_MS, with MAX_CAPTURE_MS as a hard
+// backstop in case no "silence" is ever detected at all.
+const SILENCE_TIMEOUT_MS = 2000;
+const MAX_CAPTURE_MS = 20000;
+
 let mode: Mode = "idle";
 let wakeWordEnabled = false;
 let latestTranscript = "";
 let latestAudioUri: string | null = null;
 let manualCaptureResolve: ((result: CaptureResult) => void) | null = null;
 let onWakeNoteCaptured: ((result: CaptureResult) => void) | null = null;
+let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+let maxDurationTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearCaptureTimers(): void {
+  if (silenceTimer) {
+    clearTimeout(silenceTimer);
+    silenceTimer = null;
+  }
+  if (maxDurationTimer) {
+    clearTimeout(maxDurationTimer);
+    maxDurationTimer = null;
+  }
+}
+
+function resetSilenceTimer(): void {
+  if (silenceTimer) clearTimeout(silenceTimer);
+  silenceTimer = setTimeout(() => {
+    if (mode === "capturing-wake") ExpoSpeechRecognitionModule.stop();
+  }, SILENCE_TIMEOUT_MS);
+}
 
 function stripWakeWord(transcript: string): string {
   const idx = transcript.toLowerCase().indexOf(WAKE_WORD);
@@ -50,11 +77,17 @@ function beginWakeCaptureSession(): void {
   setWakeWordDebug({ status: "registro l'appunto..." });
   ExpoSpeechRecognitionModule.start({
     lang: SPEECH_RECOGNITION_LOCALE,
-    continuous: false,
+    continuous: true,
     interimResults: true,
     requiresOnDeviceRecognition: true,
     recordingOptions: { persist: true },
   });
+
+  clearCaptureTimers();
+  resetSilenceTimer();
+  maxDurationTimer = setTimeout(() => {
+    if (mode === "capturing-wake") ExpoSpeechRecognitionModule.stop();
+  }, MAX_CAPTURE_MS);
 }
 
 function beginManualCaptureSession(): void {
@@ -79,7 +112,11 @@ ExpoSpeechRecognitionModule.addListener("result", (event) => {
       mode = "transitioning-to-wake-capture";
       ExpoSpeechRecognitionModule.stop();
     }
-  } else if (mode === "capturing-wake" || mode === "capturing-manual") {
+  } else if (mode === "capturing-wake") {
+    latestTranscript = transcript;
+    setWakeWordDebug({ lastTranscript: transcript });
+    resetSilenceTimer();
+  } else if (mode === "capturing-manual") {
     latestTranscript = transcript;
     setWakeWordDebug({ lastTranscript: transcript });
   }
@@ -98,6 +135,7 @@ ExpoSpeechRecognitionModule.addListener("end", () => {
       beginManualCaptureSession();
       return;
     case "capturing-wake": {
+      clearCaptureTimers();
       mode = "idle";
       const result: CaptureResult = { transcript: stripWakeWord(latestTranscript), audioUri: latestAudioUri };
       onWakeNoteCaptured?.(result);
