@@ -1,0 +1,9 @@
+This folder must contain two real files downloaded from the Picovoice Console
+(https://console.picovoice.ai/) before the wake-word feature will work. See
+mobile/SETUP.md for the full walkthrough. Expected files:
+
+  appunta_ios.ppn          Custom wake word model for "appunta" (iOS platform)
+  porcupine_params_it.pv   Italian language model for Porcupine
+
+Both are free to generate with a Picovoice account. Delete this file once
+the two above are in place.
